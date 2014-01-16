@@ -57,6 +57,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\fintp_utils\src;..\fintp_log\src;$(IncludePath)</IncludePath>
     <LibraryPath>..\fintp_log\$(Configuration);..\fintp_utils\$(Configuration);$(LibraryPath)</LibraryPath>
+    <TargetName>$(ProjectName)d</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
