@@ -145,7 +145,10 @@ void AmqHelper::doConnect( const string& brokerURIName, bool force )
 		else
 		{
 			if ( m_Connection && !force )
+			{
 				DEBUG( "Already connected" )
+				return;
+			}
 			else
 				DEBUG( "Forced reconnection" )
 		}
