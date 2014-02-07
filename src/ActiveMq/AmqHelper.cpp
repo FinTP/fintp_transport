@@ -864,41 +864,26 @@ long AmqHelper::peek( const string& queueName, bool first )
 {
 	TEST_SESSION
 
-	QueueBrowser* queueBrowser = NULL;
-	scoped_ptr <QueueBrowser> scopedQueueBrowser;
+	if ( /*first ||*/ m_QueueBrowser == NULL || queueName != m_QueueBrowser->getQueue()->getQueueName() )
+	{
+		delete m_QueueBrowser;
+		m_QueueBrowser = NULL;
 
-	if ( !queueName.empty() && queueName != m_QueueName )
-	{
-		DEBUG( "Peeking queue [" << queueName << "]" )
-		ActiveMQQueue queue ( queueName );
-		scopedQueueBrowser.reset ( m_Session->createBrowser( &queue ) );
-		queueBrowser = scopedQueueBrowser.get();
-	}
-	else
-	{
-		if ( first || m_QueueBrowser == NULL )
-		{
-			delete m_QueueBrowser;
-			ActiveMQQueue queue ( m_QueueName );
-			m_QueueBrowser = m_Session->createBrowser( &queue, m_Selector );
-		}
-		queueBrowser = m_QueueBrowser;
-		DEBUG( "Peeking current queue [" << m_QueueName << "]" )
+		ActiveMQQueue queue( queueName );
+		m_QueueBrowser = m_Session->createBrowser( &queue, m_Selector );
 	}
 
-	long result = -1;
+	DEBUG( "Peeking queue [" << queueName << "]" )
 
 	scoped_ptr <Message> msg;
-	MessageEnumeration* enumeration = queueBrowser->getEnumeration();
+	MessageEnumeration* enumeration = m_QueueBrowser->getEnumeration();
+
 	if ( enumeration->hasMoreMessages() )
-	{
-		msg.reset( enumeration->nextMessage());
-		result = 0;
-	}
-	result = setLastMessageInfo ( msg.get(), NULL, true );
+		msg.reset( enumeration->nextMessage() );
 
 	DEBUG( "Peeked" );
-	return result;
+
+	return setLastMessageInfo( msg.get(), NULL, true );
 }
 
 void AmqHelper::putGroupMessage( ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast )
