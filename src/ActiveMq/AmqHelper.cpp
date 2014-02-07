@@ -41,6 +41,7 @@
 #include "AmqHelper.h"
 #include "Base64.h"
 #include "Collections.h"
+#include "StringUtil.h"
 
 #ifndef WIN32
 	#include <unistd.h>
@@ -59,7 +60,7 @@ using activemq::commands::ActiveMQTextMessage;
 using activemq::commands::ActiveMQBytesMessage;
 
 #define NO_THROW( X ) do { try { X; } catch ( ... ) {} } while (0);
-#define TEST_SESSION  do { if ( m_Session == NULL ) throw logic_error("NULL Session at __FILE__:__LINE__."); } while (0);
+#define TEST_SESSION  do { if ( m_Session == NULL ) throw logic_error("NULL Session at " + string(__FILE__) + ":" + StringUtil::ToString(__LINE__)); } while (0);
 #define MQRO_NONE 0
 
 class ExportedTransportObject ActiveMQCPPLibraryManager
@@ -1154,7 +1155,8 @@ long AmqHelper::doGetOne( ManagedBuffer* buffer, bool getForClean, bool syncpoin
  */
 bool AmqHelper::commit()
 {
-	TEST_SESSION
+	if ( m_Session == NULL )
+		return false;
 
 	DEBUG( "Commit" );
 	bool result = true;
@@ -1180,7 +1182,8 @@ bool AmqHelper::commit()
  */
 bool AmqHelper::rollback()
 {	
-	TEST_SESSION
+	if ( m_Session == NULL )
+		return false;
 
 	DEBUG( "Rollback" );
 	bool result = true;
