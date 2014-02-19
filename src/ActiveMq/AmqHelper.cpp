@@ -35,6 +35,7 @@
 #include <activemq/commands/ActiveMQMessage.h>
 #include <activemq/commands/ActiveMQTextMessage.h>
 #include <activemq/commands/ActiveMQBytesMessage.h>
+#include <activemq/core/PrefetchPolicy.h>
 #include <activemq/core/RedeliveryPolicy.h>
 #include <cms/InvalidSelectorException.h>
 
@@ -101,10 +102,17 @@ void AmqHelper::setConnectionBrokerURI()
 	try
 	{
 		m_Connection = dynamic_cast <ActiveMQConnection*> ( connectionFactory.createConnection() );
-		RedeliveryPolicy *policy = m_Connection->getRedeliveryPolicy();
-		policy->setMaximumRedeliveries( -1 );
-		policy->setInitialRedeliveryDelay( 0 );
-		policy->setRedeliveryDelay( 0 );
+		if ( m_Connection == NULL )
+			throw runtime_error( "Connection is not an ActiveMQConnection." );
+
+		PrefetchPolicy* prefetchPolicy = m_Connection->getPrefetchPolicy();
+		prefetchPolicy->setQueuePrefetch( 0 );
+
+		RedeliveryPolicy* redeliveryPolicy = m_Connection->getRedeliveryPolicy();
+		redeliveryPolicy->setMaximumRedeliveries( -1 );
+		redeliveryPolicy->setInitialRedeliveryDelay( 0 );
+		redeliveryPolicy->setRedeliveryDelay( 0 );
+
 		m_Connection->start();
 		m_Session = m_Connection->createSession( Session::SESSION_TRANSACTED );
 		m_Producer = m_Session->createProducer( NULL );
@@ -260,8 +268,12 @@ void AmqHelper::disconnect()
 
 	delete m_Producer;
 	m_Producer = NULL;
+	delete m_AutoAcknowledgeProducer;
+	m_AutoAcknowledgeProducer = NULL;
 	delete m_Session;
 	m_Session = NULL;
+	delete m_AutoAcknowledgeSession;
+	m_AutoAcknowledgeSession = NULL;
 	delete m_Connection;
 	m_Connection = NULL;
 
@@ -941,14 +953,6 @@ long AmqHelper::getGroupMessage( ManagedBuffer* groupMessageBuffer, const string
 
 		string selector = "JMSXGroupID='"+groupId+"'" +" AND JMSXGroupSeq=" + sequence.str();
 
-		//release prefetched messages for m_Consumer
-		if ( m_Consumer != NULL )
-		{
-			m_Consumer->close();
-			delete m_Consumer;
-			m_Consumer = NULL;
-		}
-
 		ActiveMQQueue queue( m_QueueName+"?consumer.exclusive=true" );
 		groupConsumer.reset( m_Session->createConsumer( &queue, selector ) );
 		scoped_ptr<Message> msg ( groupConsumer->receive( m_Timeout ) );
@@ -1047,27 +1051,9 @@ long AmqHelper::doGetOne( ManagedBuffer* buffer, bool getForClean, bool syncpoin
 		try
 		{
 			if ( !syncpoint )
-			{
-				//release prefetched messagef for m_Consumer
-				if ( m_Consumer )
-				{
-					m_Consumer->close();
-					delete m_Consumer;
-					m_Consumer = NULL;
-				}
 				msg.reset( m_AutoAcknowledgeConsumer->receive( m_Timeout ) );
-			}
 			else
-			{
-				//release prefetched messagef for m_AutoAcknowledgeConsumer
-				if ( m_AutoAcknowledgeConsumer )
-				{
-					m_AutoAcknowledgeConsumer->close();
-					delete m_AutoAcknowledgeConsumer;
-					m_AutoAcknowledgeConsumer = NULL;
-				}
 				msg.reset( m_Consumer->receive( m_Timeout ) );
-			}
 		}
 		catch( const CMSException& e )
 		{
@@ -1198,13 +1184,7 @@ void AmqHelper::clearMessages()
 	ActiveMQQueue queue( m_QueueName );
 	scoped_ptr<MessageConsumer> consumer( m_Session->createConsumer( &queue ) );
 	scoped_ptr<Message> msg;
-	//release prefetched messages for m_Consumer
-	if ( m_Consumer!= NULL )
-	{
-		m_Consumer->close();
-		delete m_Consumer;
-		m_Consumer = NULL;
-	}
+
 	unsigned int i = 0;
 	do
 	{
