@@ -64,6 +64,10 @@ using activemq::commands::ActiveMQBytesMessage;
 #define TEST_SESSION  do { if ( m_Session == NULL ) throw logic_error("NULL Session at " + string(__FILE__) + ":" + StringUtil::ToString(__LINE__)); } while (0);
 #define MQRO_NONE 0
 
+const string AmqHelper::FINTPGROUPID = "FinTPGroupId";
+const string AmqHelper::FINTPGROUPSEQ = "FinTPGroupSeq";
+const string AmqHelper::FINTPLASTINGROUP = "FinTPLastInGroup";
+
 class ExportedTransportObject ActiveMQCPPLibraryManager
 {
 	private:
@@ -491,7 +495,7 @@ void AmqHelper::updateSelector( string& selector )
 	{
 		if ( !selector.empty() )
 			selector = selector + " AND ";
-		selector = selector + "JMSXGroupID='" + m_GroupId +"'";
+		selector = selector + FINTPGROUPID + "='" + m_GroupId + "'";
 	}
 }
 
@@ -510,17 +514,18 @@ void AmqHelper::setLastMessageIds( const Message& msg )
 	m_CorrelationId = Base64::encode( correlationId );
 	DEBUG( "Correlation id : [" << m_CorrelationId << "]" );
 
-	if ( msg.propertyExists( "JMSXGroupID" ) )
+	if ( msg.propertyExists( FINTPGROUPID ) && msg.propertyExists( FINTPGROUPSEQ )  )
 	{
-		const string& groupId = msg.getStringProperty( "JMSXGroupID" );
+		const string& groupId = msg.getStringProperty( FINTPGROUPID );
 		m_GroupId = Base64::encode( groupId );
 		DEBUG( "Group id : [" << m_GroupId << "]" );
-	}
-
-	if ( msg.propertyExists( "JMSXGroupSeq" ) )
-	{
-		m_GroupSequence =  msg.getIntProperty( "JMSXGroupSeq" );
+		m_GroupSequence =  msg.getIntProperty( FINTPGROUPSEQ );
 		DEBUG( "Sequence id : [" << m_GroupSequence << "]" );
+	}
+	else
+	{
+		m_GroupId = "";
+		m_GroupSequence = 0;
 	}
 }
 
@@ -619,7 +624,9 @@ int AmqHelper::setLastMessageInfo ( Message* msg, ManagedBuffer* buffer, bool br
 			m_ApplicationName.clear();
 		DEBUG( "Message Type : [" << msg->getCMSType() << "]" );
 		m_MessageCMSTimestamp = msg->getCMSTimestamp();
-		m_LastInGroup = ( ( msg->getIntProperty("JMSXGroupSeq" ) == -1 ) ? true : false ) ;
+		m_LastInGroup = msg->propertyExists( FINTPGROUPID ) &&\
+						msg->propertyExists( FINTPLASTINGROUP ) &&\
+						msg->getBooleanProperty( FINTPLASTINGROUP ) ;
 		if ( m_SaveBackup && !browse && get )
 			send( m_BackupQueueName, *msg, syncpoint );
 		return 0;
@@ -791,7 +798,7 @@ void AmqHelper::putOne( Message& msg, bool syncpoint )
 				msg.setCMSCorrelationID( m_CorrelationId );
 
 			if ( m_UsePassedGroupId )
-				msg.setStringProperty( "JMSXGroupID", m_GroupId );
+				msg.setStringProperty( FINTPGROUPID, m_GroupId );
 
 			if ( m_UsePassedAppName )
 				msg.setStringProperty( "AppName", m_ApplicationName ); 
@@ -924,9 +931,9 @@ void AmqHelper::putGroupMessage( ManagedBuffer* buffer, const string& batchId, l
 	theMsg.setCMSType("MQMT_DATAGRAM");
 
 	if ( isLast )
-		messageSequence = -1;
-	theMsg.setIntProperty( "JMSXGroupSeq", messageSequence );
-	theMsg.setStringProperty( "JMSXGroupID", batchId );
+		theMsg.setBooleanProperty( FINTPLASTINGROUP, true );
+	theMsg.setIntProperty( FINTPGROUPSEQ, messageSequence );
+	theMsg.setStringProperty( FINTPGROUPID, batchId );
 
 	putOne( theMsg );
 }
@@ -940,83 +947,53 @@ long AmqHelper::getGroupMessage( ManagedBuffer* groupMessageBuffer, const string
 		throw logic_error("NULL buffer");
 
 	scoped_ptr<MessageConsumer> groupConsumer;
-	try
+
+	if ( m_GroupLogicOrder.find( groupId ) != m_GroupLogicOrder.end() )
+		m_GroupLogicOrder[groupId]++;
+	else
+		m_GroupLogicOrder.insert( pair<string, int>( groupId, 1 ) );
+
+	const string sequence = StringUtil::ToString( m_GroupLogicOrder[groupId] );
+
+	const string selector = FINTPGROUPID + "='" + groupId + "'" + " AND " + FINTPGROUPSEQ + "=" + sequence;
+
+	const ActiveMQQueue queue( m_QueueName );
+	groupConsumer.reset( m_Session->createConsumer( &queue, selector ) );
+	scoped_ptr<Message> msg ( groupConsumer->receive( m_Timeout ) );
+
+	if ( msg == NULL )
+		return -1;
+
+	if ( ( m_AutoAbandon > 0 ) && ( msg->getIntProperty( "JMSXDeliveryCount" ) >= m_AutoAbandon ) )
 	{
-		ostringstream sequence;
-
-		if ( m_GroupLogicOrder.find( groupId ) != m_GroupLogicOrder.end() )
-			m_GroupLogicOrder[ groupId ]++;
-		else
-			m_GroupLogicOrder.insert( pair<string, int>(groupId, 1));
-
-		sequence << m_GroupLogicOrder[ groupId ];
-
-		string selector = "JMSXGroupID='"+groupId+"'" +" AND JMSXGroupSeq=" + sequence.str();
-
-		ActiveMQQueue queue( m_QueueName+"?consumer.exclusive=true" );
-		groupConsumer.reset( m_Session->createConsumer( &queue, selector ) );
-		scoped_ptr<Message> msg ( groupConsumer->receive( m_Timeout ) );
-
-		bool lastMessage = false;
-
-		if ( msg == NULL )
-		{
-			groupConsumer->close();
-			groupConsumer.reset( m_Session->createConsumer( &queue , "JMSXGroupID='"+groupId+"' AND JMSXGroupSeq=-1" ) );
-			msg.reset( groupConsumer->receive( m_Timeout ) );
-			if ( msg == NULL )
-			{
-				groupConsumer->close();
-				return -1;
-			}
-			lastMessage = true;
-		}
-
-		if ( ( m_AutoAbandon > 0 ) && ( msg->getIntProperty( "JMSXDeliveryCount" ) >= m_AutoAbandon ) )
-		{
-				TRACE( "AutoAbandon set to " << m_AutoAbandon << "message is moved to deadletter." );
-				TRACE( "Message in batch exceed backoutcount, sequence for dequeued mesage is [" << m_GroupSequence << "]" );
-				putToDeadLetterQueue( *(msg.get()) );
-				isCleaningUp = true;
-				groupConsumer->close();
-				return -2;
-		}
-
-		const TextMessage* textMsg = dynamic_cast<const TextMessage*>( msg.get() );
-		if ( textMsg )
-			groupMessageBuffer->copyFrom( textMsg->getText() );
-		else
-		{
-			const BytesMessage* bytesMsg = dynamic_cast<const BytesMessage*>( msg.get() );
-			if ( bytesMsg )
-				groupMessageBuffer->copyFrom( bytesMsg->getBodyBytes(), bytesMsg->getBodyLength() );
-			else
-				throw runtime_error("Unknown message type");
-		}
-
-		setLastMessageInfo( msg.get(), NULL );
-	
-		DEBUG( "Sequence for dequeued message : " << m_GroupSequence )
-
-		// last batch item .. set message flags accordingly
-		if ( lastMessage )
-		{
-			m_GroupLogicOrder.erase(groupId);
-			m_LastInGroup=true;
-			DEBUG( "Message is LAST" );
-		}
-		else
-			m_LastInGroup=false;
-
-		groupConsumer->close();
-		return 0;
+			TRACE( "AutoAbandon set to " << m_AutoAbandon << "message is moved to deadletter." );
+			TRACE( "Message in batch exceed backoutcount, sequence for dequeued mesage is [" << sequence << "]" );
+			putToDeadLetterQueue( *(msg.get()) );
+			isCleaningUp = true;
+			return -2;
 	}
-	catch ( ... )
+
+	const TextMessage* textMsg = dynamic_cast<const TextMessage*>( msg.get() );
+	if ( textMsg )
+		groupMessageBuffer->copyFrom( textMsg->getText() );
+	else
 	{
-		if ( groupConsumer != NULL ) 
-			groupConsumer->close();
-		throw;
+		const BytesMessage* bytesMsg = dynamic_cast<const BytesMessage*>( msg.get() );
+		if ( bytesMsg )
+			groupMessageBuffer->copyFrom( bytesMsg->getBodyBytes(), bytesMsg->getBodyLength() );
+		else
+			throw runtime_error("Unknown message type");
 	}
+
+	setLastMessageInfo( msg.get(), NULL );
+
+	if ( m_LastInGroup )
+	{
+		m_GroupLogicOrder.erase(groupId);
+		DEBUG( "Message is LAST" );
+	}
+
+	return 0;
 }
 
 long AmqHelper::getOne( bool getForClean )
@@ -1182,16 +1159,13 @@ void AmqHelper::clearMessages()
 {
 	TEST_SESSION
 	ActiveMQQueue queue( m_QueueName );
-	scoped_ptr<MessageConsumer> consumer( m_Session->createConsumer( &queue ) );
+	scoped_ptr<MessageConsumer> consumer( m_AutoAcknowledgeSession->createConsumer( &queue ) );
 	scoped_ptr<Message> msg;
 
-	unsigned int i = 0;
 	do
 	{
-		i++;
 		msg.reset( consumer->receive( m_Timeout ) );
 	} while ( msg != NULL );
-	commit();
 }
 
 /**

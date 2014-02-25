@@ -39,7 +39,7 @@ namespace FinTP
 
 			string m_ReplyBrokerURI;
 			string m_BackoutQueueName;
-			map<string, int> m_GroupLogicOrder;	string m_ConnectionString, m_Selector;
+			string m_ConnectionString, m_Selector;
 
 			TRANSPORT_MESSAGE_TYPE m_MessageType;
 
@@ -67,6 +67,12 @@ namespace FinTP
 			std::string ToString( TRANSPORT_MESSAGE_TYPE messageType );
 
 			void closeQueue();
+
+			static const string FINTPGROUPID;
+			static const string FINTPGROUPSEQ;
+			static const string FINTPLASTINGROUP;
+
+			map<string, int> m_GroupLogicOrder;
 
 		public :
 
