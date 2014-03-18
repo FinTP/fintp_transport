@@ -851,7 +851,7 @@ long WMqHelper::getOne( ManagedBuffer* buffer, bool syncpoint, bool keepJMSHeade
 {
 	ImqGetMessageOptions gmo;	// Get message options
 
-	gmo.setOptions( MQGMO_WAIT | MQGMO_FAIL_IF_QUIESCING | MQGMO_VERSION_2 );
+	gmo.setOptions( MQGMO_WAIT | MQGMO_FAIL_IF_QUIESCING );
 	gmo.setWaitInterval( 15000 );  /* 15 second limit for waiting     */
 
 	if ( syncpoint )
@@ -868,7 +868,7 @@ long WMqHelper::getOne( unsigned char* buffer, size_t maxSize, bool syncpoint )
 	DEBUG( "Getting one message - wrapper" );
 	ImqGetMessageOptions gmo;	// Get message options
 
-	gmo.setOptions( MQGMO_WAIT | MQGMO_FAIL_IF_QUIESCING | MQGMO_VERSION_2 );
+	gmo.setOptions( MQGMO_WAIT | MQGMO_FAIL_IF_QUIESCING );
 	gmo.setWaitInterval( 15000 );  /* 15 second limit for waiting     */
 	
 	if ( syncpoint )
@@ -1280,7 +1280,7 @@ unsigned int WMqHelper::StripJMSHeader( ImqMessage& msg, string& msgFormat ) con
 			{
 				while( headerOffset < returnValue - headerLength )
 				{
-					nextHeaderLength = *( ( unsigned long* )( headerBuffer + headerOffset ) );
+					nextHeaderLength = *( reinterpret_cast< MQLONG* >( headerBuffer + headerOffset ) );
 					if( conversionNeeded )
 						nextHeaderLength = Convert::ChangeEndian( nextHeaderLength );
 					memcpy( headerStrucId, headerBuffer + headerOffset + sizeof( MQLONG ), 4 );
