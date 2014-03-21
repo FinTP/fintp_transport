@@ -70,7 +70,7 @@ void TransportReplyOptions::Parse( const string& options )
 	}
 }
 
-string TransportReplyOptions::ToString()
+string TransportReplyOptions::ToString() const
 {
 		int replySize = m_Options.size();
 		stringstream message;
@@ -84,7 +84,7 @@ string TransportReplyOptions::ToString()
 
 }
 
-bool TransportReplyOptions::optionsSet()
+bool TransportReplyOptions::optionsSet() const
 {
 	return ( m_Options.size() > 0 && m_Options[0] != NONE );
 }
@@ -274,3 +274,8 @@ TransportHelper::TRANSPORT_HELPER_TYPE TransportHelper::parseTransportType( cons
 	isDefault = false;
 	return NULL;
  }
+
+void TransportHelper::putSAAmessage( const TransportReplyOptions& replyOptions, const string& replyQueue, ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast )
+{
+	throw runtime_error( "SAA not supported for this helper type." );
+}

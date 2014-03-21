@@ -79,9 +79,9 @@ namespace FinTP
 			int getSize()const { return m_Options.size(); }
 			ReplyOption operator[]( int i )const { return m_Options[ i ]; }
 			void addReplyOption( const ReplyOption& option) { m_Options.push_back( option ); }
-			bool isReplyOption( const string& replyValue );
-			bool optionsSet();
-			string ToString();
+			bool isReplyOption( const string& replyValue ) const;
+			bool optionsSet() const;
+			string ToString() const;
 			void Parse( const string& options);
 
 		private :
@@ -194,6 +194,8 @@ namespace FinTP
 
 
 			virtual void putGroupMessage( ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast ) = 0;
+
+			virtual void putSAAmessage( const TransportReplyOptions& replyOptions, const string& replyQueue, ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast );
 
 			// request/reply puts messages
 			virtual void putOneRequest( unsigned char* buffer, size_t bufferSize, const string& rtqName, const string& rtqmName, TransportReplyOptions& replyOptions ) = 0;

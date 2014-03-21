@@ -134,6 +134,8 @@ namespace FinTP
 			long getGroupMessage( ManagedBuffer* groupMessageBuffer, const string& groupId, bool& isCleaningUp );
 			void putGroupMessage( ManagedBuffer* buffer,const string& batchId, long messageSequence, bool isLast );
 
+			void putSAAmessage( const TransportReplyOptions& replyOptions, const string& replyQueue, ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast );
+
 			/**
 			* interface declared request/reply
 			*/

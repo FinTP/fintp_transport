@@ -1723,3 +1723,63 @@ string WMqHelper::getLastMessageFormat() const
 		else
 			return TMT_STRING;
 }
+
+void WMqHelper::putSAAmessage( const TransportReplyOptions& replyOptions, const string& replyQueue, ManagedBuffer* buffer, const string& batchId, long messageSequence, bool isLast )
+{
+	DEBUG( "Putting one message in group" );
+	ImqPutMessageOptions pmo;
+	pmo.setOptions( MQPMO_NEW_MSG_ID | MQPMO_FAIL_IF_QUIESCING );
+
+	WMqHelper::setSyncPointParticipation( pmo, 1 );
+
+	ImqMessage msg;
+	MQBYTE24 MY_GROUP_ID;
+
+	memset( MY_GROUP_ID, 0, sizeof( MY_GROUP_ID ) );
+	string::size_type grpIdLen = batchId.length();
+	if ( grpIdLen > sizeof( MY_GROUP_ID ) )
+		grpIdLen = sizeof( MY_GROUP_ID );
+
+	memcpy( MY_GROUP_ID, batchId.c_str(), grpIdLen );
+
+	ImqBinary grpId = WMqHelper::createBinary( ( void* )MY_GROUP_ID );
+	msg.setMessageType( MQMT_DATAGRAM );
+
+	//TODO Check if setSequenceNumber is neccessary
+	msg.setSequenceNumber( messageSequence );
+	if ( isLast )
+	{
+		DEBUG( "Last message in group" );
+		msg.setMessageFlags( MQMF_LAST_MSG_IN_GROUP );
+	}
+	else
+	{
+		msg.setMessageFlags( MQMF_MSG_IN_GROUP );
+	}
+
+	if ( msg.setGroupId( grpId ) )
+	{
+		stringstream grpIdStr;
+		grpIdStr << string( ( char* )( msg.groupId().dataPointer() ) );
+
+		DEBUG( "Group ID set successfully to [" << grpIdStr.str() << "]" );
+	}
+	else
+	{
+		DEBUG( "Group ID could not be set" );
+	}
+
+	if ( buffer->size() == 0 )
+		throw runtime_error( "Enqueing empty payload to WMQ." );
+
+	//SAA-MQHA way, MQMT_DATAGRAM message for ACK, NACK request
+	if( replyOptions.optionsSet( ) )
+	{
+		msg.setMessageType( MQMT_REQUEST );
+		msg.setReport( ParseReplyOptions( replyOptions ) );
+		msg.setReplyToQueueManagerName( m_QueueManager.name());
+		msg.setReplyToQueueName( m_ReplyQueue.data() );
+	}//SAA-MQHA way
+
+	putOne( ( unsigned char * )buffer->buffer(), buffer->size(), pmo, msg );
+}
