@@ -585,7 +585,7 @@ int AmqHelper::noMessage()
 	return -1;
 }
 
-int AmqHelper::setLastMessageInfo ( Message* msg, ManagedBuffer* buffer, bool browse, bool get, bool syncpoint  )
+int AmqHelper::setLastMessageInfo( Message* msg, ManagedBuffer* buffer, bool browse, bool get, bool syncpoint )
 {
 	if ( msg != NULL )
 	{
@@ -601,11 +601,13 @@ int AmqHelper::setLastMessageInfo ( Message* msg, ManagedBuffer* buffer, bool br
 		{
 			if ( const BytesMessage* bytesMessage = dynamic_cast<const BytesMessage*>( msg ) )
 			{
-				const unsigned char* const bytesData = bytesMessage->getBodyBytes();
 				m_MessageFormatPointer = &TMT_NONE;
-				m_MessageLength = bytesMessage->getBodyLength();
 				if ( !browse && buffer != NULL )
-					writeToBuffer ( *buffer, bytesData );
+				{
+					const unsigned char* const bytesData = bytesMessage->getBodyBytes();
+					m_MessageLength = bytesMessage->getBodyLength();
+					writeToBuffer( *buffer, bytesData );
+				}
 			}
 			else
 				return noMessage();
@@ -769,6 +771,7 @@ void AmqHelper::putOne( unsigned char* buffer, size_t bufferSize, Message& msg )
 		byteMsg.setBodyBytes( buffer, bufferSize );
 		putOne( byteMsg );
 	}
+	m_MessageLength = bufferSize;
 }
 
 void AmqHelper::putOne( Message& msg, bool syncpoint )
@@ -856,6 +859,7 @@ void AmqHelper::putOne( const ManagedBuffer& buffer, bool syncpoint )
 		byteMsg.setBodyBytes( buffer.buffer(), buffer.size() );
 		putOne( byteMsg, syncpoint );
 	}
+	m_MessageLength = buffer.size();
 }
 
 Message* AmqHelper::createMsg()
