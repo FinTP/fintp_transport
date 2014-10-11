@@ -146,7 +146,7 @@ namespace FinTP
 			string getApplicationName() const { return m_ApplicationName; } 
 			std::string getLastReplyQueueManager() const { return m_ConnectionString; }
 
-			long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = true ) { return doGetOne(buffer, false, syncpoint); }
+			long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = false ) { return doGetOne(buffer, false, syncpoint); }
 			/* FIXME */
 
 	};

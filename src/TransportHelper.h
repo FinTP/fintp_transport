@@ -48,7 +48,7 @@ namespace FinTP
 {
 	/**
 	 * \class TransportReplyOptions
-	 * \brief Define MQ reply options implemented in qPI
+	 * \brief Define MQ reply options implemented in FinTP
 	 * \details Stores all used "report options" needed to processe MQ report message.
 	 * Report options can be transferd to the client instances by 'long TransportHelper::getLastReplyOptions()'
 	 *
@@ -183,7 +183,7 @@ namespace FinTP
 			 * \param bool syncpoint: true value, make the operation part of unit of work spanned over multiple operation
 			 * \param bool keepJMSHeader: true value, make MQ header part of buffer
 			 */
-			virtual long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = true ) = 0;
+			virtual long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = false ) = 0;
 
 			/**
 			 * \brief

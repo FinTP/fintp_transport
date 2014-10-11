@@ -102,14 +102,14 @@ namespace FinTP
 			 * interface declared gets messages
 			 */
 			long getOne( unsigned  char* buffer, size_t maxSize, bool syncpoint = true );
-			long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = true );
+			long getOne( ManagedBuffer* buffer, bool syncpoint = true, bool keepJMSHeader = false );
 			/**
 			 * overloads
 			 */
 			long getOne( unsigned  char* buffer, size_t maxSize, ImqGetMessageOptions& gmo );
 			long getOne( unsigned  char* buffer, size_t maxSize, ImqGetMessageOptions& gmo, ImqMessage& msg );
 			long getOne( ManagedBuffer* buffer, ImqGetMessageOptions& gmo );
-			long getOne( ManagedBuffer* buffer, ImqGetMessageOptions& gmo, ImqMessage& msg, bool getForClean = false, bool keepJMSHeader = true );
+			long getOne( ManagedBuffer* buffer, ImqGetMessageOptions& gmo, ImqMessage& msg, bool getForClean = false, bool keepJMSHeader = false );
 
 			/**
 			* interface declared put messages
