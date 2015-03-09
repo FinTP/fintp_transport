@@ -415,6 +415,7 @@ void WMqHelper::closeQueue()
 			TRACE( "Close queue [" << lclQueueName << "] ended with reason code : " << reasonCode );
 		}
 		m_QueueOpenRefCount--;
+		m_OpenOption = MQOO_INQUIRE;
 		DEBUG( "Queue ["  << lclQueueName << "] open refcount = " << m_QueueOpenRefCount );
 	}
 	catch( ... )
